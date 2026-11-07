@@ -1,6 +1,17 @@
 # IPQuality
 
-Dual-Stack (IPv4 + IPv6) IP Reputation, GeoIP Consensus, Streaming/AI Unlock, CDN Edge & DNSBL Diagnostics Script.
+Dual-Stack (IPv4 + IPv6) IP Reputation, BGP/RPKI Routing, Fraud Score, Streaming/AI/Platform Unlock, CDN Edge, Server Telemetry & DNSBL Diagnostics Script.
+
+## Features
+- **I. Basic Information & BGP Routing** — ASN, Announced BGP Prefix, Anycast detection, RPKI ROA validity, Upstream Transit Peers (Tier-1 / IX labels), GeoIP & rDNS (PTR).
+- **II. IP Type Classification (12 Databases)** — Usage & Company type across IPinfo, ipregistry, ipapi.is, IP2Location, ipdata.co, ipwho.is, MaxMind, AbuseIPDB, ProxyCheck, ip-api.com, ipquery.io, Scamalytics.
+- **III. Fraud & Abuse Risk Scores (10 Engines)** — Visual 256-color gauge bars for Scamalytics, IPQualityScore, ipquery.io, IP2Location, AbuseIPDB, ProxyCheck.io, ipapi.is, ipregistry.co, ipdata.co, DB-IP.
+- **IV. Security & Risk Factors (8 Sources)** — Country consensus, Proxy, VPN, Tor, Datacenter/Server, Abuser, and Robot/Crawler flags.
+- **V. Streaming, AI & Web Accessibility** — TikTok, Disney+, Netflix, YouTube, Spotify, Twitch, ChatGPT, Gemini, Claude, xAI Grok, Cloudflare, Google, Reddit, Wikipedia (Rangeblock check), Steam, Instagram, GitHub API rate-limit, and Telegram API.
+- **VI. CDN Edge Nodes** — Closest Anycast POPs for Cloudflare, YouTube (GGC), Netflix (OCA), Fastly, and AWS CloudFront.
+- **VII. Email Connectivity & DNSBL** — Local Port 25 outbound check, MX TCP reachability (Gmail, Outlook, Yahoo, Apple, Proton, Yandex, Mail.ru, Zoho), and 10 DNSBL spam blacklists.
+- **VIII. Server Network & Routing Telemetry** — Direct Public IP vs NAT detection, virtualization type, Linux kernel & TCP congestion control (BBR check), Outbound DNS (EDNS leak check), and Anycast RTT latency (Cloudflare, Google, Quad9).
+- **Overall IP Quality Verdict** — Aggregated Trust Score (`0–100`) and letter Grade (`A+` to `F`).
 
 ## Quick Run (Dual-Stack IPv4 + IPv6)
 ```bash

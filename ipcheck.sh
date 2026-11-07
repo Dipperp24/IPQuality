@@ -67,33 +67,40 @@ if [[ -n "$CUSTOM_IP" ]] && ! is_valid_ipv4 "$CUSTOM_IP" && ! is_valid_ipv6 "$CU
     exit 1
 fi
 
-# --- ANSI Colors ---
+# --- Modern 256-Color Palette ---
 if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
     readonly C_RESET=$'\033[0m'
     readonly C_BOLD=$'\033[1m'
-    readonly C_DIM=$'\033[0;90m'
-    readonly C_CYAN=$'\033[1;36m'
-    readonly C_BAR=$'\033[0;36m'
-    readonly C_GREEN=$'\033[1;32m'
-    readonly C_YELLOW=$'\033[1;33m'
-    readonly C_RED=$'\033[1;31m'
-    readonly C_BLUE=$'\033[1;34m'
-    readonly C_BADGE=$'\033[1;30;46m'
+    readonly C_DIM=$'\033[38;5;243m'
+    readonly C_BORDER=$'\033[38;5;239m'
+    readonly C_TRACK=$'\033[38;5;237m'
+    readonly C_CYAN=$'\033[38;5;110m'
+    readonly C_ACCENT=$'\033[1;38;5;117m'
+    readonly C_WHITE=$'\033[1;38;5;255m'
+    readonly C_BAR=$'\033[38;5;75m'
+    readonly C_GREEN=$'\033[38;5;114m'
+    readonly C_YELLOW=$'\033[38;5;221m'
+    readonly C_RED=$'\033[38;5;203m'
+    readonly C_BLUE=$'\033[38;5;75m'
+    readonly C_PURPLE=$'\033[38;5;141m'
+    readonly C_BADGE=$'\033[1;48;5;24;38;5;195m'
 
-    readonly BG_GREEN=$'\033[42;30m'
-    readonly BG_YELLOW=$'\033[43;30m'
-    readonly BG_RED=$'\033[41;97m'
-    readonly BG_GRAY=$'\033[100;37m'
+    # Soft dark-tinted pills (easy on the eyes)
+    readonly BG_GREEN=$'\033[48;5;22;38;5;120m'
+    readonly BG_YELLOW=$'\033[48;5;58;38;5;228m'
+    readonly BG_RED=$'\033[48;5;52;38;5;210m'
+    readonly BG_BLUE=$'\033[48;5;24;38;5;159m'
+    readonly BG_GRAY=$'\033[48;5;236;38;5;246m'
 else
-    readonly C_RESET="" C_BOLD="" C_DIM="" C_CYAN="" C_BAR=""
-    readonly C_GREEN="" C_YELLOW="" C_RED="" C_BLUE="" C_BADGE=""
-    readonly BG_GREEN="" BG_YELLOW="" BG_RED="" BG_GRAY=""
+    readonly C_RESET="" C_BOLD="" C_DIM="" C_BORDER="" C_TRACK=""
+    readonly C_CYAN="" C_ACCENT="" C_WHITE="" C_BAR=""
+    readonly C_GREEN="" C_YELLOW="" C_RED="" C_BLUE="" C_PURPLE="" C_BADGE=""
+    readonly BG_GREEN="" BG_YELLOW="" BG_RED="" BG_BLUE="" BG_GRAY=""
 fi
 
 readonly CLEAR_LINE=$'\r\033[K'
 readonly SPINNER_FRAMES=(⠋ ⠙ ⠹ ⠸ ⠼ ⠴ ⠦ ⠧ ⠇ ⠏)
-readonly HEADER_MARK="┃"
-readonly LINE_SEP="──────────────────────────────────────────────────────────────────────────────"
+readonly RAIL="│"
 readonly UA_BROWSER="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 
 BASE_TMP=$(mktemp -d -t ipq.XXXXXX)
@@ -159,8 +166,21 @@ wait_with_spinner() {
 }
 
 print_section() {
-    printf '\n %s%s%s %s%s%s\n' "$C_BAR" "$HEADER_MARK" "$C_RESET" "$C_CYAN" "$1" "$C_RESET"
-    printf ' %s%s%s\n' "$C_DIM" "$LINE_SEP" "$C_RESET"
+    local title="$1"
+    local pad_len=$((74 - ${#title}))
+    ((pad_len < 4)) && pad_len=4
+    local line=""
+    local i
+    for ((i = 0; i < pad_len; i++)); do line+="─"; done
+    printf '\n %s╭─%s %s%s%s %s%s%s\n' "$C_BORDER" "$C_RESET" "$C_ACCENT" "$title" "$C_RESET" "$C_BORDER" "$line" "$C_RESET"
+}
+
+print_rail() {
+    printf ' %s%s%s ' "$C_BORDER" "$RAIL" "$C_RESET"
+}
+
+print_section_end() {
+    printf ' %s╰──────────────────────────────────────────────────────────────────────────────%s\n' "$C_BORDER" "$C_RESET"
 }
 
 jq_get() {
@@ -170,6 +190,44 @@ jq_get() {
     res=$(jq -r "(${query}) | if . == null or . == \"\" then \"N/A\" else tostring end" "$file" 2>/dev/null || true)
     [[ -z "$res" ]] && res="N/A"
     printf '%s' "$res"
+}
+
+asn_label() {
+    case "$1" in
+        1299)  printf 'Arelion (Tier-1)' ;;
+        174)   printf 'Cogent (Tier-1)' ;;
+        3356)  printf 'Lumen (Tier-1)' ;;
+        2914)  printf 'NTT (Tier-1)' ;;
+        3257)  printf 'GTT (Tier-1)' ;;
+        6453)  printf 'Tata (Tier-1)' ;;
+        6762)  printf 'Sparkle (Tier-1)' ;;
+        6939)  printf 'Hurricane Electric' ;;
+        9002)  printf 'RETN' ;;
+        6461)  printf 'Zayo (Tier-1)' ;;
+        3491)  printf 'PCCW Global' ;;
+        7018)  printf 'AT&T (Tier-1)' ;;
+        701)   printf 'Verizon' ;;
+        3320)  printf 'Deutsche Telekom' ;;
+        5511)  printf 'Orange (Tier-1)' ;;
+        12956) printf 'Telxius' ;;
+        4809)  printf 'China Telecom CN2' ;;
+        4134)  printf 'ChinaNet (163)' ;;
+        4837)  printf 'China Unicom' ;;
+        9808|58453) printf 'China Mobile CMI' ;;
+        12389) printf 'Rostelecom' ;;
+        20485) printf 'TransTeleCom' ;;
+        8359)  printf 'MTS' ;;
+        31133) printf 'MegaFon' ;;
+        3216)  printf 'VimpelCom' ;;
+        49505) printf 'Selectel' ;;
+        13335) printf 'Cloudflare' ;;
+        16509) printf 'Amazon AWS' ;;
+        15169) printf 'Google' ;;
+        8075)  printf 'Microsoft' ;;
+        24940) printf 'Hetzner' ;;
+        16276) printf 'OVHcloud' ;;
+        *)     printf '' ;;
+    esac
 }
 
 # --- ISO Country Mapper ---
@@ -238,7 +296,7 @@ format_type_badge() {
         *hosting*|*datacenter*|*dch*|*transit*|*cloud*|*server*|*vpn*|*colocation*)
             printf "${BG_RED} %-8s ${C_RESET}" "Hosting" ;;
         *cdn*|*content*)
-            printf "${BG_RED} %-8s ${C_RESET}" "CDN" ;;
+            printf "${BG_BLUE} %-8s ${C_RESET}" "CDN" ;;
         *spider*|*ses*|*crawler*|*bot*)
             printf "${BG_RED} %-8s ${C_RESET}" "Crawler" ;;
         *line*|*fixed*)
@@ -250,7 +308,7 @@ format_type_badge() {
         *business*|*com*|*commercial*|*corporate*|*org*|*bank*)
             printf "${BG_YELLOW} %-8s ${C_RESET}" "Business" ;;
         *edu*|*university*|*school*)
-            printf "${BG_YELLOW} %-8s ${C_RESET}" "Edu" ;;
+            printf "${BG_BLUE} %-8s ${C_RESET}" "Edu" ;;
         *gov*|*mil*)
             printf "${BG_YELLOW} %-8s ${C_RESET}" "Gov" ;;
         *)
@@ -260,49 +318,57 @@ format_type_badge() {
 
 draw_score_bar() {
     local label="$1" score="$2" disp_val="$3" level_txt="$4"
-    local bar_len
-    bar_len=$(awk -v s="$score" 'BEGIN { len=int(s * 0.42); if(len<1) len=1; if(len>42) len=42; print len }')
-    local bar_color="$BG_GREEN" txt_color="$C_GREEN"
+    local total_cells=34
+    local fill_len
+    fill_len=$(awk -v s="$score" -v t="$total_cells" 'BEGIN { len=int((s / 100.0) * t + 0.5); if(s>0 && len<1) len=1; if(len<0) len=0; if(len>t) len=t; print len }')
+    local empty_len=$((total_cells - fill_len))
 
+    local fill_color="$C_GREEN" pill_bg="$BG_GREEN"
     case "$level_txt" in
         High|VeryHigh|DoS|Risky|HighRisk)
-            bar_color="$BG_RED"; txt_color="$C_RED" ;;
+            fill_color="$C_RED"; pill_bg="$BG_RED" ;;
         Medium|Elevated|Suspicious)
-            bar_color="$BG_YELLOW"; txt_color="$C_YELLOW" ;;
+            fill_color="$C_YELLOW"; pill_bg="$BG_YELLOW" ;;
         *)
-            bar_color="$BG_GREEN"; txt_color="$C_GREEN" ;;
+            fill_color="$C_GREEN"; pill_bg="$BG_GREEN" ;;
     esac
 
-    local spaces
-    spaces=$(printf "%${bar_len}s" "")
-    printf " ${C_CYAN}%-15s${C_RESET}${bar_color}${spaces}${C_RESET} ${txt_color}${C_BOLD}%s (%s)${C_RESET}\n" "${label}:" "$disp_val" "$level_txt"
+    local fill_str="" empty_str="" i
+    for ((i = 0; i < fill_len; i++)); do fill_str+="━"; done
+    for ((i = 0; i < empty_len; i++)); do empty_str+="─"; done
+
+    print_rail
+    printf "${C_CYAN}%-15s${C_RESET} ${fill_color}%s${C_RESET}${C_TRACK}%s${C_RESET}  ${fill_color}${C_BOLD}%-9s${C_RESET} ${pill_bg} %-8s ${C_RESET}\n" \
+        "$label" "$fill_str" "$empty_str" "$disp_val" "$level_txt"
 }
 
 fmt_bool() {
     case "$1" in
-        true|Yes|yes|1) printf "${C_RED}${C_BOLD}%-8s${C_RESET}" "Yes" ;;
-        false|No|no|0)  printf "${C_GREEN}%-8s${C_RESET}" "No" ;;
-        *)              printf "${C_DIM}%-8s${C_RESET}" "N/A" ;;
+        true|Yes|yes|1) printf "${C_RED}${C_BOLD}● Yes   ${C_RESET}" ;;
+        false|No|no|0)  printf "${C_GREEN}○ No    ${C_RESET}" ;;
+        *)              printf "${C_DIM}· N/A   ${C_RESET}" ;;
     esac
 }
 
 fmt_reg() {
     if [[ -n "$1" && "$1" != "null" && "$1" != "N/A" && ${#1} -eq 2 ]]; then
-        printf "${C_GREEN}%-8s${C_RESET}" "[${1}]"
+        printf "${C_ACCENT}[%s]    ${C_RESET}" "$1"
     else
-        printf "${C_DIM}%-8s${C_RESET}" "N/A"
+        printf "${C_DIM}· N/A   ${C_RESET}"
     fi
 }
 
 fmt_srv_status() {
     case "$1" in
-        Yes)      printf "${BG_GREEN} %-8s ${C_RESET}" "Yes" ;;
-        NoPrem)   printf "${BG_RED} %-8s ${C_RESET}" "NoPrem" ;;
-        OrigOnly) printf "${BG_YELLOW} %-8s ${C_RESET}" "OrigOnly" ;;
-        NoIPv6)   printf "${BG_GRAY} %-8s ${C_RESET}" "NoIPv6" ;;
-        Clean*)   printf "${BG_GREEN} %-8s ${C_RESET}" "Clean" ;;
-        Captcha*) printf "${BG_YELLOW} %-8s ${C_RESET}" "Captcha" ;;
-        Block|*)  printf "${BG_RED} %-8s ${C_RESET}" "Blocked" ;;
+        Yes)      printf "${BG_GREEN} ✔ Yes    ${C_RESET}" ;;
+        NoPrem)   printf "${BG_RED} ✘ NoPrem ${C_RESET}" ;;
+        OrigOnly) printf "${BG_YELLOW} OrigOnly ${C_RESET}" ;;
+        NoIPv6)   printf "${BG_GRAY} NoIPv6   ${C_RESET}" ;;
+        Clean*)   printf "${BG_GREEN} ✔ Clean  ${C_RESET}" ;;
+        Captcha*) printf "${BG_YELLOW} Captcha  ${C_RESET}" ;;
+        RangeBlk) printf "${BG_YELLOW} RangeBlk ${C_RESET}" ;;
+        RateLim)  printf "${BG_YELLOW} RateLim  ${C_RESET}" ;;
+        Block|*)  printf "${BG_RED} ✘ Block  ${C_RESET}" ;;
     esac
 }
 
@@ -311,9 +377,12 @@ fmt_srv_type() {
         Native)       printf "${BG_GREEN} %-8s ${C_RESET}" "Native" ;;
         GoogleDB)     printf "${BG_YELLOW} %-8s ${C_RESET}" "GoogleDB" ;;
         ViaDNS|Proxy) printf "${BG_YELLOW} %-8s ${C_RESET}" "ViaDNS" ;;
+        Editable)     printf "${BG_GREEN} %-8s ${C_RESET}" "Editable" ;;
+        ReadOnly)     printf "${BG_YELLOW} %-8s ${C_RESET}" "ReadOnly" ;;
         200*)         printf "${BG_GREEN} %-8s ${C_RESET}" "200 OK" ;;
+        403*)         printf "${BG_RED} %-8s ${C_RESET}" "HTTP 403" ;;
         429*)         printf "${BG_YELLOW} %-8s ${C_RESET}" "HTTP 429" ;;
-        *)            printf " %-8s " "" ;;
+        *)            printf "${BG_GRAY} %-8s ${C_RESET}" "${1:--}" ;;
     esac
 }
 
@@ -329,7 +398,7 @@ run_check_for_stack() {
     local TMP_DIR="$BASE_TMP/${IPV_LABEL}"
     mkdir -p "$TMP_DIR"
 
-    # --- 1. Fetch All 12+ IP Databases in Parallel (IPv4 Resilient) ---
+    # --- 1. Fetch All 12+ IP Databases & BGP Telemetry in Parallel ---
     (
         if [[ -s "$BASE_TMP/mm_token" ]]; then
             local mmt
@@ -342,6 +411,15 @@ run_check_for_stack() {
         fi
         curl -sLm 5 -A "$UA_BROWSER" "https://stat.ripe.net/data/prefix-overview/data.json?resource=${TARGET_IP}" > "$TMP_DIR/ripe_asn.json"
         curl -sLm 5 -A "$UA_BROWSER" "https://stat.ripe.net/data/rir-stats-country/data.json?resource=${TARGET_IP}" > "$TMP_DIR/ripe_reg.json"
+
+        local r_asn r_pfx
+        r_asn=$(jq -r '.data.asns[0].asn // empty' "$TMP_DIR/ripe_asn.json" 2>/dev/null || true)
+        r_pfx=$(jq -r '.data.resource // empty' "$TMP_DIR/ripe_asn.json" 2>/dev/null || true)
+        if [[ -n "$r_asn" && -n "$r_pfx" ]]; then
+            curl -sLm 4 -A "$UA_BROWSER" "https://stat.ripe.net/data/rpki-validation/data.json?resource=AS${r_asn}&prefix=${r_pfx}" > "$TMP_DIR/ripe_rpki.json" &
+            curl -sLm 4 -A "$UA_BROWSER" "https://stat.ripe.net/data/asn-neighbours/data.json?resource=AS${r_asn}" > "$TMP_DIR/ripe_peers.json" &
+            wait
+        fi
     ) &
 
     (
@@ -648,6 +726,138 @@ run_check_for_stack() {
             fi
         ) &
 
+        # Extra Platforms & Proxy Cleanliness (Reddit, Wikipedia, Steam, Instagram, GitHub, Telegram)
+        (
+            local rd_code
+            rd_code=$(curl -sL "$IPV_MODE" -m 5 -A "$UA_BROWSER" -o /dev/null -w "%{http_code}" "https://www.reddit.com/api/v1/me.json" 2>/dev/null || true)
+            if [[ "$rd_code" == "000" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_reddit"
+            elif [[ "$rd_code" == "200" ]]; then
+                echo "Yes|OK|200 OK" > "$TMP_DIR/ext_reddit"
+            elif [[ "$rd_code" == "403" ]]; then
+                echo "Block|VPN/DC|403" > "$TMP_DIR/ext_reddit"
+            elif [[ "$rd_code" == "429" ]]; then
+                echo "RateLim|N/A|429" > "$TMP_DIR/ext_reddit"
+            else
+                echo "Block|N/A|Err" > "$TMP_DIR/ext_reddit"
+            fi
+        ) &
+
+        (
+            local wk_res wk_blk
+            wk_res=$(curl -sL "$IPV_MODE" -m 5 -A "$UA_BROWSER" "https://en.wikipedia.org/w/api.php?action=query&meta=userinfo&uiprop=blockinfo&format=json" 2>/dev/null || true)
+            if [[ -z "$wk_res" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_wiki"
+            elif [[ -n "$wk_res" ]]; then
+                wk_blk=$(jq -r '.query.userinfo.blockid // empty' <<<"$wk_res" 2>/dev/null || true)
+                if [[ -z "$wk_blk" ]]; then
+                    echo "Clean|OK|Editable" > "$TMP_DIR/ext_wiki"
+                else
+                    echo "RangeBlk|Proxy|ReadOnly" > "$TMP_DIR/ext_wiki"
+                fi
+            else
+                echo "Block|N/A|Err" > "$TMP_DIR/ext_wiki"
+            fi
+        ) &
+
+        (
+            local st_hdr st_cc=""
+            st_hdr=$(curl -sIL "$IPV_MODE" -m 5 -A "$UA_BROWSER" "https://store.steampowered.com/" 2>/dev/null | tr -d '\r' || true)
+            if [[ -z "$st_hdr" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_steam"
+            elif [[ "$st_hdr" =~ steamCountry=([A-Z]{2}) ]]; then
+                st_cc="${BASH_REMATCH[1]}"
+                echo "Yes|${st_cc}|Native" > "$TMP_DIR/ext_steam"
+            elif [[ "$st_hdr" == *"200"* ]]; then
+                echo "Yes|OK|200 OK" > "$TMP_DIR/ext_steam"
+            else
+                echo "Block|N/A|Err" > "$TMP_DIR/ext_steam"
+            fi
+        ) &
+
+        (
+            local ig_code
+            ig_code=$(curl -sL "$IPV_MODE" -m 5 -A "$UA_BROWSER" -o /dev/null -w "%{http_code}" "https://www.instagram.com/accounts/login/" 2>/dev/null || true)
+            if [[ "$ig_code" == "000" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_insta"
+            elif [[ "$ig_code" == "200" ]]; then
+                echo "Yes|OK|200 OK" > "$TMP_DIR/ext_insta"
+            elif [[ "$ig_code" == "429" || "$ig_code" == "302" ]]; then
+                echo "Captcha|Login|429" > "$TMP_DIR/ext_insta"
+            else
+                echo "Block|N/A|${ig_code:-Err}" > "$TMP_DIR/ext_insta"
+            fi
+        ) &
+
+        (
+            local gh_res gh_rem
+            gh_res=$(curl -sL "$IPV_MODE" -m 5 -A "$UA_BROWSER" "https://api.github.com/rate_limit" 2>/dev/null || true)
+            if [[ -z "$gh_res" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_github"
+            elif [[ -n "$gh_res" ]]; then
+                gh_rem=$(jq -r '.resources.core.remaining // empty' <<<"$gh_res" 2>/dev/null || true)
+                if [[ -n "$gh_rem" && "$gh_rem" -gt 0 ]] 2>/dev/null; then
+                    echo "Clean|${gh_rem}/60|200 OK" > "$TMP_DIR/ext_github"
+                else
+                    echo "RateLim|0/60|403" > "$TMP_DIR/ext_github"
+                fi
+            else
+                echo "Block|N/A|Err" > "$TMP_DIR/ext_github"
+            fi
+        ) &
+
+        (
+            local tg_code
+            tg_code=$(curl -s "$IPV_MODE" -m 5 -A "$UA_BROWSER" -o /dev/null -w "%{http_code}" "https://api.telegram.org" 2>/dev/null || true)
+            if [[ "$tg_code" == "000" && "$IPV_MODE" == "-6" ]]; then
+                echo "NoIPv6|N/A|-" > "$TMP_DIR/ext_telegram"
+            elif [[ "$tg_code" =~ ^(200|301|302|404)$ ]]; then
+                echo "Yes|OK|Native" > "$TMP_DIR/ext_telegram"
+            else
+                echo "Block|N/A|Err" > "$TMP_DIR/ext_telegram"
+            fi
+        ) &
+
+        # Outbound DNS Resolver (EDNS Leak Check) & Anycast Latency
+        (
+            local rnd_sub edns_res
+            rnd_sub=$(printf '%08x%08x%08x%08x' "$RANDOM" "$RANDOM" "$RANDOM" "$RANDOM")
+            edns_res=$(curl -sLm 4 -A "$UA_BROWSER" "https://${rnd_sub}.edns.ip-api.com/json" 2>/dev/null || true)
+            if [[ -n "$edns_res" ]]; then
+                local d_ip d_geo
+                d_ip=$(jq -r '.dns.ip // empty' <<<"$edns_res" 2>/dev/null || true)
+                d_geo=$(jq -r '.dns.geo // empty' <<<"$edns_res" 2>/dev/null || true)
+                [[ -n "$d_ip" ]] && printf '%s|%s\n' "$d_ip" "${d_geo:-Unknown}" > "$TMP_DIR/edns_info"
+            fi
+        ) &
+
+        (
+            local t_cf="1.1.1.1" t_gg="8.8.8.8" t_q9="9.9.9.9"
+            if [[ "$IPV_MODE" == "-6" ]]; then
+                t_cf="2606:4700:4700::1111"
+                t_gg="2001:4860:4860::8888"
+                t_q9="2620:fe::fe"
+            fi
+            for pair in "cf|${t_cf}|https://1.1.1.1" "gg|${t_gg}|https://dns.google" "q9|${t_q9}|https://dns.quad9.net"; do
+                (
+                    IFS='|' read -r k ip url <<<"$pair"
+                    local rtt=""
+                    if command -v ping &>/dev/null; then
+                        rtt=$(ping "$IPV_MODE" -c 2 -i 0.2 -W 1 "$ip" 2>/dev/null | awk -F'/' '/rtt|round-trip/ {printf "%.1f ms", $5}' || true)
+                    fi
+                    if [[ -z "$rtt" ]]; then
+                        local t_conn
+                        t_conn=$(curl -s "$IPV_MODE" -m 2 -o /dev/null -w "%{time_connect}" "$url" 2>/dev/null || true)
+                        if [[ -n "$t_conn" && "$t_conn" != "0.000000" ]]; then
+                            rtt=$(awk -v t="$t_conn" 'BEGIN {printf "%.1f ms (TCP)", t * 1000}')
+                        fi
+                    fi
+                    echo "${rtt:-Timeout}" > "$TMP_DIR/rtt_${k}"
+                ) &
+            done
+            wait
+        ) &
+
         # Port 25 & MX Reachability
         (
             local mx_addr
@@ -796,6 +1006,35 @@ run_check_for_stack() {
     PTR_RECORD=$(cat "$TMP_DIR/ptr.txt" 2>/dev/null || true)
     [[ -z "$PTR_RECORD" ]] && PTR_RECORD="No PTR (Missing rDNS)"
 
+    # --- Parse BGP Prefix, RPKI ROA & Upstream Transit ---
+    local BGP_PREFIX RPKI_STATUS ANYCAST_FLAG UPSTREAM_TXT=""
+    BGP_PREFIX=$(jq -r '.data.resource // empty' "$TMP_DIR/ripe_asn.json" 2>/dev/null || true)
+    RPKI_STATUS=$(jq -r '.data.status // empty' "$TMP_DIR/ripe_rpki.json" 2>/dev/null || true)
+    ANYCAST_FLAG=$(jq -r '.data.anycast // empty' "$TMP_DIR/ipinfo_widget.json" 2>/dev/null || true)
+
+    if [[ -s "$TMP_DIR/ripe_peers.json" ]]; then
+        local total_peers up_asns
+        total_peers=$(jq -r '.data.neighbour_counts.left // 0' "$TMP_DIR/ripe_peers.json" 2>/dev/null || echo 0)
+        up_asns=$(jq -r '[.data.neighbours[]? | select(.type=="left")] | sort_by(-.power) | .[0:4] | .[].asn' "$TMP_DIR/ripe_peers.json" 2>/dev/null || true)
+        if [[ -n "$up_asns" ]]; then
+            local asn_item lbl items=()
+            for asn_item in $up_asns; do
+                lbl=$(asn_label "$asn_item")
+                if [[ -n "$lbl" ]]; then
+                    items+=("AS${asn_item} (${lbl})")
+                else
+                    items+=("AS${asn_item}")
+                fi
+            done
+            local idx
+            for ((idx = 0; idx < ${#items[@]}; idx++)); do
+                ((idx > 0)) && UPSTREAM_TXT+=", "
+                UPSTREAM_TXT+="${items[idx]}"
+            done
+            ((total_peers > 4)) && UPSTREAM_TXT+=" (+$((total_peers - 4)) more)"
+        fi
+    fi
+
     # --- Parse 12 IP Types ---
     local T_INF_U=$(jq_get "$TMP_DIR/ipinfo_widget.json" '.data.asn.type')
     local T_INF_C=$(jq_get "$TMP_DIR/ipinfo_widget.json" '.data.company.type')
@@ -900,42 +1139,59 @@ run_check_for_stack() {
     fi
 
     printf '\n'
-    printf ' %s%s%s %s %s\n' "$C_BAR" "$HEADER_MARK" "$C_RESET" "${C_BADGE} IPQUALITY ${C_RESET}" "${C_BOLD}${IPV_LABEL} Diagnostics Report ( ${DISP_IP} )${C_RESET}"
-    printf ' %s%s%s %s\n' "$C_BAR" "$HEADER_MARK" "$C_RESET" "${C_DIM}Report Time: ${REPORT_TIME} · Stack: ${IPV_LABEL}${C_RESET}"
+    printf ' %s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$C_BORDER" "$C_RESET"
+    printf ' %s│%s  %s  %s%s Diagnostics · %s%s\n' \
+        "$C_BORDER" "$C_RESET" "${C_BADGE}  IPQUALITY  ${C_RESET}" \
+        "${C_WHITE}" "$IPV_LABEL" "$DISP_IP" "${C_RESET}"
+    printf ' %s│%s  %sReport Time: %s   ·   Mode: %s Stack%s\n' \
+        "$C_BORDER" "$C_RESET" "${C_DIM}" "$REPORT_TIME" "$IPV_LABEL" "${C_RESET}"
+    printf ' %s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$C_BORDER" "$C_RESET"
 
-    # --- I. Basic Information ---
-    print_section "I. Basic Information (MaxMind / RIPE / IPinfo)"
-    printf " ${C_CYAN}%-18s${C_RESET}${C_BOLD}%s${C_RESET} (%s)\n" "IP Address:" "$DISP_IP" "$IPV_LABEL"
-    printf " ${C_CYAN}%-18s${C_RESET}%s\n" "ASN:" "${ASN:-N/A}"
-    printf " ${C_CYAN}%-18s${C_RESET}%s\n" "Organization:" "${ORG:-N/A}"
-    printf " ${C_CYAN}%-18s${C_RESET}%s\n" "Location:" "${CITY:-N/A}${POSTAL:+, $POSTAL}, ${COUNTRY_NAME:-N/A} [${COUNTRY_CODE:-N/A}]"
-    printf " ${C_CYAN}%-18s${C_RESET}[%s]\n" "Registered In:" "${REG_COUNTRY:-N/A}"
-    printf " ${C_CYAN}%-18s${C_RESET}%s\n" "Time Zone:" "${TIMEZONE:-N/A}"
-    printf " ${C_CYAN}%-18s${C_RESET}%s\n" "Coordinates:" "${LAT_LON:-N/A}"
-    if [[ "$PTR_RECORD" == "No PTR"* ]]; then
-        printf " ${C_CYAN}%-18s${C_RESET}${C_YELLOW}%s${C_RESET}\n" "PTR (rDNS):" "$PTR_RECORD"
-    else
-        printf " ${C_CYAN}%-18s${C_RESET}${C_GREEN}%s${C_RESET}\n" "PTR (rDNS):" "$PTR_RECORD"
+    # --- I. Basic Information & BGP Routing ---
+    print_section "I. Basic Information & BGP Routing"
+    print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_WHITE}%s${C_RESET} ${C_DIM}(%s)${C_RESET}\n" "IP Address:" "$DISP_IP" "$IPV_LABEL"
+    print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_ACCENT}%s${C_RESET} ${C_DIM}·${C_RESET} %s\n" "ASN / Holder:" "${ASN:-N/A}" "${ORG:-N/A}"
+    if [[ -n "$BGP_PREFIX" ]]; then
+        local rpki_badge="${C_DIM}Unknown${C_RESET}"
+        case "$RPKI_STATUS" in
+            valid)   rpki_badge="${C_GREEN}✔ RPKI Valid${C_RESET}" ;;
+            invalid) rpki_badge="${C_RED}✘ RPKI Invalid${C_RESET}" ;;
+            unknown) rpki_badge="${C_YELLOW}○ RPKI NotFound${C_RESET}" ;;
+        esac
+        local anycast_txt=""
+        [[ "$ANYCAST_FLAG" == "true" ]] && anycast_txt=" ${C_DIM}·${C_RESET} ${C_PURPLE}Anycast${C_RESET}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}%s ${C_DIM}·${C_RESET} %s%s\n" "BGP Prefix:" "$BGP_PREFIX" "$rpki_badge" "$anycast_txt"
     fi
+    [[ -n "$UPSTREAM_TXT" ]] && { print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Upstreams:" "$UPSTREAM_TXT"; }
+    print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Location:" "${CITY:-N/A}${POSTAL:+, $POSTAL}, ${COUNTRY_NAME:-N/A} [${COUNTRY_CODE:-N/A}]"
+    print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] ${C_DIM}· Time Zone:${C_RESET} %s\n" "Registered In:" "${REG_COUNTRY:-N/A}" "${TIMEZONE:-N/A}"
+    print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Coordinates:" "${LAT_LON:-N/A}"
+    if [[ "$PTR_RECORD" == "No PTR"* ]]; then
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_YELLOW}%s${C_RESET}\n" "PTR (rDNS):" "$PTR_RECORD"
+    else
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_GREEN}%s${C_RESET}\n" "PTR (rDNS):" "$PTR_RECORD"
+    fi
+    print_section_end
 
     # --- II. IP Type (12 Databases, Full Labels) ---
-    print_section "II. IP Type (12 Databases)"
-    printf " ${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Database:" "IPinfo" "ipregistry" "ipapi.is" "IP2Loc" "ipdata.co" "ipwho.is"
-    printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Usage:" \
+    print_section "II. IP Type Classification (12 Databases)"
+    print_rail; printf "${C_DIM}%-11s%-11s%-11s%-11s%-11s%-11s%-11s${C_RESET}\n" "Database" "IPinfo" "ipregistry" "ipapi.is" "IP2Loc" "ipdata.co" "ipwho.is"
+    print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Usage:" \
         "$(format_type_badge "$T_INF_U")" "$(format_type_badge "$T_REG_U")" "$(format_type_badge "$T_API_U")" \
         "$(format_type_badge "$T_I2L_U")" "$(format_type_badge "$T_IPD_U")" "$(format_type_badge "$T_WHO_U")"
-    printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Company:" \
+    print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Company:" \
         "$(format_type_badge "$T_INF_C")" "$(format_type_badge "$T_REG_C")" "$(format_type_badge "$T_API_C")" \
         "$(format_type_badge "$T_I2L_C")" "$(format_type_badge "$T_IPD_C")" "$(format_type_badge "$T_WHO_C")"
-    printf '\n'
-    printf " ${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Database:" "MaxMind" "AbuseIPDB" "ProxyCheck" "ip-api.com" "ipquery.io" "Scamalytics"
-    printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Usage:" \
+    print_rail; printf '\n'
+    print_rail; printf "${C_DIM}%-11s%-11s%-11s%-11s%-11s%-11s%-11s${C_RESET}\n" "Database" "MaxMind" "AbuseIPDB" "ProxyCheck" "ip-api.com" "ipquery.io" "Scamalytics"
+    print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Usage:" \
         "$(format_type_badge "$T_MAX_U")" "$(format_type_badge "$T_ABU_U")" "$(format_type_badge "$T_PCK_U")" \
         "$(format_type_badge "$T_IPA_U")" "$(format_type_badge "$T_IPQ_U")" "$(format_type_badge "$T_SCM_U")"
+    print_section_end
 
     # --- III. Risk Score (10 Engines) ---
-    print_section "III. Risk Score (10 Engines)"
-    printf " ${C_CYAN}%-15s${C_RESET}${BG_GREEN} Low          ${C_RESET}${BG_YELLOW} Medium       ${C_RESET}${BG_RED} High         ${C_RESET}\n" "Risk Levels:"
+    print_section "III. Fraud & Abuse Risk Scores (10 Engines)"
+    print_rail; printf "${C_DIM}%-16s${C_RESET}${BG_GREEN} ● Low (0-24) ${C_RESET}  ${BG_YELLOW} ● Medium (25-64) ${C_RESET}  ${BG_RED} ● High (65+) ${C_RESET}\n" "Scale Legend:"
 
     if [[ -n "$SCAM_SCORE" ]]; then
         local lvl="Low"; ((SCAM_SCORE >= 25)) && lvl="Medium"; ((SCAM_SCORE >= 60)) && lvl="High"
@@ -978,10 +1234,11 @@ run_check_for_stack() {
         local lvl="Low"; ((DBIP_SCORE == 50)) && lvl="Medium"; ((DBIP_SCORE == 100)) && lvl="High"
         draw_score_bar "DB-IP" "$DBIP_SCORE" "${DBIP_SCORE}%" "$lvl"
     fi
+    print_section_end
 
     # --- IV. Risk Factors Matrix (8 Sources) ---
     print_section "IV. Security & Risk Factors (8 Sources)"
-    printf " ${C_CYAN}%-10s${C_RESET}%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s\n" "Factor" "IP2Loc" "ipapi" "ipreg" "ipquery" "Scamal" "ipdata" "PCheck" "ip-api"
+    print_rail; printf "${C_DIM}%-10s%-8s%-8s%-8s%-8s%-8s%-8s%-8s%-8s${C_RESET}\n" "Factor" "IP2Loc" "ipapi" "ipreg" "ipquery" "Scamal" "ipdata" "PCheck" "ip-api"
 
     local C_I2L=$(jq -r '.country_code // empty' "$TMP_DIR/ip2loc_direct.json" 2>/dev/null || echo "$COUNTRY_CODE")
     local C_API=$(jq -r '.location.country_code // empty' "$TMP_DIR/ipapi_is.json" 2>/dev/null || true)
@@ -994,7 +1251,7 @@ run_check_for_stack() {
     local C_PCK=$(jq -r --arg ip "$TARGET_IP" '.[$ip].isocode // empty' "$TMP_DIR/proxycheck.json" 2>/dev/null || true)
     local C_IPA=$(jq -r '.countryCode // empty' "$TMP_DIR/ip_api.json" 2>/dev/null || true)
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Country" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Country" \
         "$(fmt_reg "$C_I2L")" "$(fmt_reg "$C_API")" "$(fmt_reg "$C_REG")" "$(fmt_reg "$C_IPQ")" \
         "$(fmt_reg "$C_SCM")" "$(fmt_reg "$C_IPD")" "$(fmt_reg "$C_PCK")" "$(fmt_reg "$C_IPA")"
 
@@ -1008,7 +1265,7 @@ run_check_for_stack() {
     local P_PCK=$(jq -r --arg ip "$TARGET_IP" '.[$ip].proxy // "N/A"' "$TMP_DIR/proxycheck.json" 2>/dev/null || true)
     local P_IPA=$(jq_get "$TMP_DIR/ip_api.json" '.proxy')
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Proxy" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Proxy" \
         "$(fmt_bool "$P_I2L")" "$(fmt_bool "$P_API")" "$(fmt_bool "$P_REG")" "$(fmt_bool "$P_IPQ")" \
         "$(fmt_bool "$P_SCM")" "$(fmt_bool "$P_IPD")" "$(fmt_bool "$P_PCK")" "$(fmt_bool "$P_IPA")"
 
@@ -1020,7 +1277,7 @@ run_check_for_stack() {
     local V_IPD=$(jq_get "$TMP_DIR/ipdata.json" '.threat.is_vpn')
     local V_PCK="No"; [[ "$T_PCK_U" == "VPN" ]] && V_PCK="Yes"
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "VPN" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "VPN" \
         "$(fmt_bool "$V_I2L")" "$(fmt_bool "$V_API")" "$(fmt_bool "$V_REG")" "$(fmt_bool "$V_IPQ")" \
         "$(fmt_bool "$V_SCM")" "$(fmt_bool "$V_IPD")" "$(fmt_bool "$V_PCK")" "$(fmt_bool "N/A")"
 
@@ -1031,7 +1288,7 @@ run_check_for_stack() {
     local R_SCM=$(jq_get "$TMP_DIR/scamalytics.json" '.scamalytics.scamalytics_proxy.is_tor_exit_node')
     local R_IPD=$(jq_get "$TMP_DIR/ipdata.json" '.threat.is_tor')
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Tor" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Tor" \
         "$(fmt_bool "$R_I2L")" "$(fmt_bool "$R_API")" "$(fmt_bool "$R_REG")" "$(fmt_bool "$R_IPQ")" \
         "$(fmt_bool "$R_SCM")" "$(fmt_bool "$R_IPD")" "$(fmt_bool "No")" "$(fmt_bool "N/A")"
 
@@ -1044,7 +1301,7 @@ run_check_for_stack() {
     local S_PCK="No"; [[ "$T_PCK_U" == "Hosting" ]] && S_PCK="Yes"
     local S_IPA=$(jq_get "$TMP_DIR/ip_api.json" '.hosting')
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Server" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Server" \
         "$(fmt_bool "$S_I2L")" "$(fmt_bool "$S_API")" "$(fmt_bool "$S_REG")" "$(fmt_bool "$S_IPQ")" \
         "$(fmt_bool "$S_SCM")" "$(fmt_bool "$S_IPD")" "$(fmt_bool "$S_PCK")" "$(fmt_bool "$S_IPA")"
 
@@ -1055,7 +1312,7 @@ run_check_for_stack() {
     local A_SCM=$(jq_get "$TMP_DIR/scamalytics.json" '.scamalytics.scamalytics_proxy.is_blacklisted_external')
     local A_IPD=$(jq_get "$TMP_DIR/ipdata.json" '.threat.is_known_abuser')
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Abuser" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Abuser" \
         "$(fmt_bool "$A_I2L")" "$(fmt_bool "$A_API")" "$(fmt_bool "$A_REG")" "$(fmt_bool "$A_PQS")" \
         "$(fmt_bool "$A_SCM")" "$(fmt_bool "$A_IPD")" "$(fmt_bool "No")" "$(fmt_bool "N/A")"
 
@@ -1066,9 +1323,10 @@ run_check_for_stack() {
     local B_SCM=$(jq_get "$TMP_DIR/scamalytics.json" '.scamalytics.scamalytics_proxy.is_google')
     local B_IPD=$(jq_get "$TMP_DIR/ipdata.json" '.threat.is_threat')
 
-    printf " ${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Robot" \
+    print_rail; printf "${C_CYAN}%-10s${C_RESET}%s%s%s%s%s%s%s%s\n" "Robot" \
         "$(fmt_bool "$B_I2L")" "$(fmt_bool "$B_API")" "$(fmt_bool "$B_REG")" "$(fmt_bool "$B_PQS")" \
         "$(fmt_bool "$B_SCM")" "$(fmt_bool "$B_IPD")" "$(fmt_bool "No")" "$(fmt_bool "N/A")"
+    print_section_end
 
     # --- V. Streaming, AI & Web Accessibility ---
     if ((IS_LOCAL_IP == 1)); then
@@ -1081,17 +1339,17 @@ run_check_for_stack() {
         IFS='|' read -r s_sp r_sp t_sp <<<"$(cat "$TMP_DIR/srv_spotify" 2>/dev/null || true)"
         IFS='|' read -r s_tw r_tw t_tw <<<"$(cat "$TMP_DIR/srv_twitch" 2>/dev/null || true)"
 
-        printf " ${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Streaming:" "TikTok" "Disney+" "Netflix" "YouTube" "Spotify" "Twitch"
-        printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Streaming:" "TikTok" "Disney+" "Netflix" "YouTube" "Spotify" "Twitch"
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
             "$(fmt_srv_status "$s_tt")" "$(fmt_srv_status "$s_dp")" "$(fmt_srv_status "$s_nf")" \
             "$(fmt_srv_status "$s_yt")" "$(fmt_srv_status "$s_sp")" "$(fmt_srv_status "$s_tw")"
-        printf " ${C_CYAN}%-11s${C_RESET} %-9s  %-9s  %-9s  %-9s  %-9s  %-9s\n" "Region:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET} %-9s  %-9s  %-9s  %-9s  %-9s  %-9s\n" "Region:" \
             "[${r_tt:-N/A}]" "[${r_dp:-N/A}]" "[${r_nf:-N/A}]" "[${r_yt:-N/A}]" "[${r_sp:-N/A}]" "[${r_tw:-N/A}]"
-        printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Type:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Type:" \
             "$(fmt_srv_type "$t_tt")" "$(fmt_srv_type "$t_dp")" "$(fmt_srv_type "$t_nf")" \
             "$(fmt_srv_type "$t_yt")" "$(fmt_srv_type "$t_sp")" "$(fmt_srv_type "$t_tw")"
 
-        printf '\n'
+        print_rail; printf '\n'
         IFS='|' read -r s_oa r_oa t_oa <<<"$(cat "$TMP_DIR/ai_chatgpt" 2>/dev/null || true)"
         IFS='|' read -r s_gm r_gm t_gm <<<"$(cat "$TMP_DIR/ai_gemini" 2>/dev/null || true)"
         IFS='|' read -r s_cl r_cl t_cl <<<"$(cat "$TMP_DIR/ai_claude" 2>/dev/null || true)"
@@ -1099,15 +1357,34 @@ run_check_for_stack() {
         IFS='|' read -r s_cf r_cf t_cf <<<"$(cat "$TMP_DIR/cdn_cf" 2>/dev/null || true)"
         IFS='|' read -r s_gs r_gs t_gs <<<"$(cat "$TMP_DIR/cdn_google" 2>/dev/null || true)"
 
-        printf " ${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "AI / Web:" "ChatGPT" "Gemini" "Claude" "xAI Grok" "Cloudflare" "Google"
-        printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "AI / Web:" "ChatGPT" "Gemini" "Claude" "xAI Grok" "Cloudflare" "Google"
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
             "$(fmt_srv_status "$s_oa")" "$(fmt_srv_status "$s_gm")" "$(fmt_srv_status "$s_cl")" \
             "$(fmt_srv_status "$s_cp")" "$(fmt_srv_status "$s_cf")" "$(fmt_srv_status "$s_gs")"
-        printf " ${C_CYAN}%-11s${C_RESET} %-9s  %-9s  %-9s  %-9s  %-9s  %-9s\n" "Region:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET} %-9s  %-9s  %-9s  %-9s  %-9s  %-9s\n" "Region:" \
             "[${r_oa:-N/A}]" "[${r_gm:-N/A}]" "[${r_cl:-N/A}]" "[${r_cp:-N/A}]" "[${r_cf:-N/A}]" "[${r_gs:-N/A}]"
-        printf " ${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Detail:" \
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Detail:" \
             "$(fmt_srv_type "$t_oa")" "$(fmt_srv_type "$t_gm")" "$(fmt_srv_type "$t_cl")" \
             "$(fmt_srv_type "$t_cp")" "$(fmt_srv_type "$t_cf")" "$(fmt_srv_type "$t_gs")"
+
+        print_rail; printf '\n'
+        IFS='|' read -r s_rd r_rd t_rd <<<"$(cat "$TMP_DIR/ext_reddit" 2>/dev/null || true)"
+        IFS='|' read -r s_wk r_wk t_wk <<<"$(cat "$TMP_DIR/ext_wiki" 2>/dev/null || true)"
+        IFS='|' read -r s_st r_st t_st <<<"$(cat "$TMP_DIR/ext_steam" 2>/dev/null || true)"
+        IFS='|' read -r s_ig r_ig t_ig <<<"$(cat "$TMP_DIR/ext_insta" 2>/dev/null || true)"
+        IFS='|' read -r s_gh r_gh t_gh <<<"$(cat "$TMP_DIR/ext_github" 2>/dev/null || true)"
+        IFS='|' read -r s_tg r_tg t_tg <<<"$(cat "$TMP_DIR/ext_telegram" 2>/dev/null || true)"
+
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Platforms:" "Reddit" "Wikipedia" "Steam" "Instagram" "GitHub" "Telegram"
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
+            "$(fmt_srv_status "$s_rd")" "$(fmt_srv_status "$s_wk")" "$(fmt_srv_status "$s_st")" \
+            "$(fmt_srv_status "$s_ig")" "$(fmt_srv_status "$s_gh")" "$(fmt_srv_status "$s_tg")"
+        print_rail; printf "${C_CYAN}%-11s${C_RESET} %-9s  %-9s  %-9s  %-9s  %-9s  %-9s\n" "Quota/Reg:" \
+            "[${r_rd:-N/A}]" "[${r_wk:-N/A}]" "[${r_st:-N/A}]" "[${r_ig:-N/A}]" "[${r_gh:-N/A}]" "[${r_tg:-N/A}]"
+        print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Access:" \
+            "$(fmt_srv_type "$t_rd")" "$(fmt_srv_type "$t_wk")" "$(fmt_srv_type "$t_st")" \
+            "$(fmt_srv_type "$t_ig")" "$(fmt_srv_type "$t_gh")" "$(fmt_srv_type "$t_tg")"
+        print_section_end
 
         # --- VI. CDN Anycast Edge Nodes ---
         print_section "VI. CDN Edge Nodes (${IPV_LABEL})"
@@ -1117,11 +1394,12 @@ run_check_for_stack() {
         IFS='|' read -r fs_cc fs_node <<<"$(cat "$TMP_DIR/cdn_fastly" 2>/dev/null || echo "-|-")"
         IFS='|' read -r aw_cc aw_node <<<"$(cat "$TMP_DIR/cdn_cloudfront" 2>/dev/null || echo "-|-")"
 
-        printf " ${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Cloudflare Edge:" "${cf_cc:--}" "${cf_node:--}"
-        printf " ${C_CYAN}%-18s${C_RESET}[%s] %s\n" "YouTube (GGC):" "${yt_cc:--}" "${yt_node:--}"
-        printf " ${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Netflix (OCA):" "${nf_cc:--}" "${nf_node:--}"
-        printf " ${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Fastly POP:" "${fs_cc:--}" "${fs_node:--}"
-        printf " ${C_CYAN}%-18s${C_RESET}[%s] %s\n" "CloudFront POP:" "${aw_cc:--}" "${aw_node:--}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Cloudflare Edge:" "${cf_cc:--}" "${cf_node:--}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] %s\n" "YouTube (GGC):" "${yt_cc:--}" "${yt_node:--}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Netflix (OCA):" "${nf_cc:--}" "${nf_node:--}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] %s\n" "Fastly POP:" "${fs_cc:--}" "${fs_node:--}"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}[%s] %s\n" "CloudFront POP:" "${aw_cc:--}" "${aw_node:--}"
+        print_section_end
     fi
 
     # --- VII. Email Connectivity & DNSBL ---
@@ -1130,9 +1408,9 @@ run_check_for_stack() {
         local p25_st
         p25_st=$(cat "$TMP_DIR/p25_local" 2>/dev/null || true)
         if [[ "$p25_st" == "Open" ]]; then
-            printf " ${C_CYAN}%-18s${C_RESET}${C_GREEN}${C_BOLD}Open (Outbound SMTP Allowed)${C_RESET}\n" "Local Port 25:"
+            print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_GREEN}${C_BOLD}Open (Outbound SMTP Allowed)${C_RESET}\n" "Local Port 25:"
         else
-            printf " ${C_CYAN}%-18s${C_RESET}${C_RED}${C_BOLD}Blocked by ISP/Hosting${C_RESET}\n" "Local Port 25:"
+            print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_RED}${C_BOLD}Blocked by ISP/Hosting${C_RESET}\n" "Local Port 25:"
         fi
 
         local m_line=""
@@ -1145,7 +1423,7 @@ run_check_for_stack() {
                 *)      m_line+="${m_name}:${C_RED}✘${C_RESET}  " ;;
             esac
         done
-        printf " ${C_CYAN}%-18s${C_RESET}%b\n" "MX Reachability:" "$m_line"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}%b\n" "MX Reachability:" "$m_line"
     fi
 
     local listed_files=("$TMP_DIR/rbl/"*)
@@ -1160,10 +1438,86 @@ run_check_for_stack() {
     local clean_count=$((RBL_TOTAL - listed_count))
 
     if ((listed_count == 0)); then
-        printf " ${C_CYAN}%-18s${C_RESET}${C_GREEN}${C_BOLD}Clean (${clean_count}/${RBL_TOTAL}) · Blacklisted: 0${C_RESET}\n" "DNSBL Status:"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_GREEN}${C_BOLD}Clean (${clean_count}/${RBL_TOTAL}) · Blacklisted: 0${C_RESET}\n" "DNSBL Status:"
     else
-        printf " ${C_CYAN}%-18s${C_RESET}${C_RED}${C_BOLD}Listed in ${listed_count}/${RBL_TOTAL}: ${listed_names[*]}${C_RESET}\n" "DNSBL Status:"
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_RED}${C_BOLD}Listed in ${listed_count}/${RBL_TOTAL}: ${listed_names[*]}${C_RESET}\n" "DNSBL Status:"
     fi
+    print_section_end
+
+    # --- VIII. Server Network & Routing Telemetry ---
+    if ((IS_LOCAL_IP == 1)); then
+        print_section "VIII. Server Network & Routing Telemetry (${IPV_LABEL})"
+        local nat_txt="${C_YELLOW}Behind NAT / Masqueraded${C_RESET}"
+        if command -v ip &>/dev/null && ip addr show 2>/dev/null | grep -Fq "$TARGET_IP"; then
+            nat_txt="${C_GREEN}Direct / Routed Public IP${C_RESET}"
+        fi
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}%b\n" "Interface & NAT:" "$nat_txt"
+
+        local virt_type="Bare Metal"
+        if command -v systemd-detect-virt &>/dev/null; then
+            virt_type=$(systemd-detect-virt 2>/dev/null || true)
+        fi
+        [[ -z "$virt_type" || "$virt_type" == "none" ]] && virt_type="Bare Metal"
+        local kern_ver tcp_cc tcp_qd tcp_badge
+        kern_ver=$(uname -r 2>/dev/null | cut -d'-' -f1-2)
+        tcp_cc=$(sysctl -n net.ipv4.tcp_congestion_control 2>/dev/null || cat /proc/sys/net/ipv4/tcp_congestion_control 2>/dev/null || echo "unknown")
+        tcp_qd=$(sysctl -n net.core.default_qdisc 2>/dev/null || cat /proc/sys/net/core/default_qdisc 2>/dev/null || echo "pfifo")
+        if [[ "$tcp_cc" == *bbr* ]]; then
+            tcp_badge="${C_GREEN}✔ ${tcp_cc} + ${tcp_qd}${C_RESET}"
+        else
+            tcp_badge="${C_YELLOW}○ ${tcp_cc} + ${tcp_qd} (Tip: enable BBR)${C_RESET}"
+        fi
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}${C_WHITE}%s${C_RESET} ${C_DIM}· Kernel %s · TCP:${C_RESET} %b\n" "Host Stack:" "${virt_type^^}" "$kern_ver" "$tcp_badge"
+
+        if [[ -s "$TMP_DIR/edns_info" ]]; then
+            IFS='|' read -r edns_ip edns_geo <<<"$(<"$TMP_DIR/edns_info")"
+            local disp_edns="$edns_ip"
+            [[ "$MASK_IP" == true && "$disp_edns" == *"."* ]] && disp_edns="${disp_edns%.*.*}.*.*"
+            print_rail; printf "${C_CYAN}%-18s${C_RESET}%s ${C_DIM}(%s)${C_RESET}\n" "Outbound DNS:" "$disp_edns" "$edns_geo"
+        fi
+
+        local rtt_cf rtt_gg rtt_q9
+        rtt_cf=$(cat "$TMP_DIR/rtt_cf" 2>/dev/null || echo "N/A")
+        rtt_gg=$(cat "$TMP_DIR/rtt_gg" 2>/dev/null || echo "N/A")
+        rtt_q9=$(cat "$TMP_DIR/rtt_q9" 2>/dev/null || echo "N/A")
+        print_rail; printf "${C_CYAN}%-18s${C_RESET}Cloudflare: ${C_WHITE}%s${C_RESET}  ${C_DIM}·${C_RESET}  Google: ${C_WHITE}%s${C_RESET}  ${C_DIM}·${C_RESET}  Quad9: ${C_WHITE}%s${C_RESET}\n" "Anycast RTT:" "$rtt_cf" "$rtt_gg" "$rtt_q9"
+        print_section_end
+    fi
+
+    # --- Overall IP Quality Verdict Card ---
+    local score_sum=0 score_cnt=0 s_val
+    for s_val in "$SCAM_SCORE" "$IPQS_SCORE" "$IPQ_SCORE" "$I2L_SCORE" "$ABUSE_SCORE" "$PCHECK_SCORE" "$IPREG_SCORE" "$IPDATA_SCORE"; do
+        if [[ "$s_val" =~ ^[0-9]+$ ]]; then
+            score_sum=$((score_sum + s_val))
+            score_cnt=$((score_cnt + 1))
+        fi
+    done
+    local avg_risk=0
+    ((score_cnt > 0)) && avg_risk=$((score_sum / score_cnt))
+    local trust_score=$((100 - avg_risk - listed_count * 6))
+    ((trust_score < 0)) && trust_score=0
+    ((trust_score > 100)) && trust_score=100
+
+    local grade="A+" grade_pill="$BG_GREEN" verdict_summary="Pristine IP reputation · Ideal for VPN, AI, Streaming & Production"
+    if ((trust_score < 35)); then
+        grade="F"; grade_pill="$BG_RED"; verdict_summary="High abuse/fraud flags · Expect frequent CAPTCHAs & blocks"
+    elif ((trust_score < 55)); then
+        grade="D"; grade_pill="$BG_RED"; verdict_summary="Elevated fraud score · May face restrictions on strict platforms"
+    elif ((trust_score < 72)); then
+        grade="C"; grade_pill="$BG_YELLOW"; verdict_summary="Moderate reputation (Typical shared datacenter/hosting subnet)"
+    elif ((trust_score < 85)); then
+        grade="B"; grade_pill="$BG_BLUE"; verdict_summary="Good reputation · Suitable for general proxy, web & API workloads"
+    elif ((trust_score < 94)); then
+        grade="A"; grade_pill="$BG_GREEN"; verdict_summary="Clean IP reputation · Great for daily browsing, AI & services"
+    fi
+
+    printf '\n'
+    printf ' %s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$C_BORDER" "$C_RESET"
+    printf ' %s│%s  %s  %sTrust Score: %3d/100%s  %s·  Avg Fraud Risk: %2d%%%s\n' \
+        "$C_BORDER" "$C_RESET" "${grade_pill}  GRADE ${grade}  ${C_RESET}" \
+        "$C_WHITE" "$trust_score" "$C_RESET" "$C_DIM" "$avg_risk" "$C_RESET"
+    printf ' %s│%s  %sVerdict:%s %s\n' "$C_BORDER" "$C_RESET" "$C_CYAN" "$C_RESET" "$verdict_summary"
+    printf ' %s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$C_BORDER" "$C_RESET"
 }
 
 # ==============================================================================
