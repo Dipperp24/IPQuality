@@ -50,6 +50,12 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipche
 bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipcheck.sh) --direct
 ```
 
+### Low-Resource VPS (Limit Concurrent Connections)
+On small VPS instances (1 vCPU, limited bandwidth/conntrack), limit concurrent background requests:
+```bash
+IPQ_PARALLEL=4 bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipcheck.sh)
+```
+
 ## Optional Custom API Keys
 You can optionally pass your own API keys via environment variables for higher rate limits or enterprise tiers (by default, the script works out of the box using keyless public demos and direct endpoints for MaxMind, IP2Location, Scamalytics, ipwhois, ProxyCheck, ip-api, ipquery, and IPinfo):
 - `IPINFO_TOKEN` — ipinfo.io API token

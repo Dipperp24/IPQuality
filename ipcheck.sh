@@ -133,9 +133,38 @@ if command curl --help all 2>/dev/null | grep -q -- '--retry-all-errors'; then
     CURL_RETRY_OPTS+=(--retry-all-errors)
 fi
 NET_LOG=""
+# Cap concurrent network requests: weak VPS (1-2 vCPU) stall when ~50 TLS
+# handshakes start at once. Override with IPQ_PARALLEL=<n>.
+CPU_COUNT=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
+[[ "$CPU_COUNT" =~ ^[0-9]+$ ]] || CPU_COUNT=1
+NET_SLOTS=$((CPU_COUNT * 4))
+((NET_SLOTS < 6)) && NET_SLOTS=6
+((NET_SLOTS > 16)) && NET_SLOTS=16
+[[ "${IPQ_PARALLEL:-}" =~ ^[0-9]+$ ]] && ((IPQ_PARALLEL > 0)) && NET_SLOTS="$IPQ_PARALLEL"
+HAVE_FLOCK=0
+command -v flock &>/dev/null && HAVE_FLOCK=1
+
 curl() {
     local rc=0
-    command curl "${CURL_RETRY_OPTS[@]}" "$@" || rc=$?
+    if [[ -n "$NET_LOG" && "$HAVE_FLOCK" == "1" ]]; then
+        local i fd got=0
+        while ((got == 0)); do
+            for ((i = 0; i < NET_SLOTS; i++)); do
+                exec {fd}>"$BASE_TMP/.slot.$i" || continue
+                if flock -n "$fd"; then
+                    got=1
+                    command curl "${CURL_RETRY_OPTS[@]}" "$@" || rc=$?
+                    flock -u "$fd"
+                    exec {fd}>&-
+                    break
+                fi
+                exec {fd}>&-
+            done
+            ((got == 0)) && sleep 0.1
+        done
+    else
+        command curl "${CURL_RETRY_OPTS[@]}" "$@" || rc=$?
+    fi
     if [[ -n "$NET_LOG" ]]; then
         local a url="" host
         for a in "$@"; do [[ "$a" == http://* || "$a" == https://* ]] && url="$a"; done
@@ -1974,8 +2003,8 @@ run_check_for_stack() {
             hosts=$(awk '$1 != 0 {print $2}' "$NET_LOG" | sort -u | head -n 8 | tr '\n' ' ')
             print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Hosts:" "$hosts"
             if ((net_fail * 4 >= net_total)); then
-                print_rail; printf "${C_YELLOW}%-18s${C_RESET}%s\n" "Hint:" "Host network/DNS drops parallel requests. N/A & NoConn are NOT blocks."
-                print_rail; printf "${C_DIM}%-18s%s${C_RESET}\n" "" "Check /etc/resolv.conf (try 1.1.1.1), firewall/conntrack limits, re-run."
+                print_rail; printf "${C_YELLOW}%-18s${C_RESET}%s\n" "Hint:" "Host is slow under parallel load. N/A & NoConn are NOT blocks."
+                print_rail; printf "${C_DIM}%-18s%s${C_RESET}\n" "" "Re-run with fewer parallel requests: IPQ_PARALLEL=4 bash <(curl ...)"
             fi
             print_section_end
         fi
