@@ -51,11 +51,13 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipche
 ```
 
 ## Optional Custom API Keys
-You can optionally pass your own API keys via environment variables for higher rate limits:
+You can optionally pass your own API keys via environment variables for higher rate limits or enterprise tiers (by default, the script works out of the box using keyless public demos and direct endpoints for MaxMind, IP2Location, Scamalytics, ipwhois, ProxyCheck, ip-api, ipquery, and IPinfo):
 - `IPINFO_TOKEN` — ipinfo.io API token
 - `IPREGISTRY_KEY` — ipregistry.co API key
 - `IPDATA_KEY` — ipdata.co API key
+- `IPAPI_KEY` — ipapi.is API key
 - `ABUSEIPDB_KEY` — AbuseIPDB APIv2 key
 - `IPQS_KEY` — IPQualityScore API key
 - `IP2LOCATION_KEY` — IP2Location.io API key
 - `PROXYCHECK_KEY` — proxycheck.io API key
+- `DBIP_KEY` — db-ip.com API key
