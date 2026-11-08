@@ -41,7 +41,7 @@ detect_public_ip() {
         urls=("https://ipv6.icanhazip.com" "https://api6.ipify.org" "https://ifconfig.me/ip")
     fi
     for url in "${urls[@]}"; do
-        res=$(curl -s "$mode" --connect-timeout 2 -m 4 "$url" 2>/dev/null | tr -d '[:space:]' || true)
+        res=$(command curl -s "$mode" --connect-timeout 2 -m 4 "$url" 2>/dev/null | tr -d '[:space:]' || true)
         if [[ "$mode" == "-4" ]]; then
             is_valid_ipv4 "$res" && { printf '%s' "$res"; return 0; }
         else
@@ -123,6 +123,28 @@ readonly RAIL="│"
 readonly UA_BROWSER="Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0"
 
 BASE_TMP=$(mktemp -d -t ipq.XXXXXX)
+
+# --- Resilient curl wrapper ---------------------------------------------------
+# Dozens of checks run in parallel; on some VPS hosts the resolver or conntrack
+# drops part of such a burst. Retry transient failures (DNS, connect, timeout,
+# TLS reset) and log every request so failures are reported, not shown as "Block".
+CURL_RETRY_OPTS=(--retry 2 --retry-delay 1 --retry-max-time 12)
+if command curl --help all 2>/dev/null | grep -q -- '--retry-all-errors'; then
+    CURL_RETRY_OPTS+=(--retry-all-errors)
+fi
+NET_LOG=""
+curl() {
+    local rc=0
+    command curl "${CURL_RETRY_OPTS[@]}" "$@" || rc=$?
+    if [[ -n "$NET_LOG" ]]; then
+        local a url="" host
+        for a in "$@"; do [[ "$a" == http://* || "$a" == https://* ]] && url="$a"; done
+        host="${url#*://}"; host="${host%%/*}"; host="${host%%\?*}"
+        printf '%s %s\n' "$rc" "${host:-?}" >> "$NET_LOG" 2>/dev/null || true
+    fi
+    return "$rc"
+}
+
 cleanup() {
     local pid
     for pid in $(jobs -pr 2>/dev/null); do kill "$pid" 2>/dev/null || true; done
@@ -394,11 +416,39 @@ fmt_srv_status() {
         NoPrem)   printf "${BG_RED} ✘ NoPrem ${C_RESET}" ;;
         OrigOnly) printf "${BG_YELLOW} OrigOnly ${C_RESET}" ;;
         NoIPv6)   printf "${BG_GRAY} NoIPv6   ${C_RESET}" ;;
+        NoConn)   printf "${BG_GRAY} ? NoConn ${C_RESET}" ;;
         Clean*)   printf "${BG_GREEN} ✔ Clean  ${C_RESET}" ;;
         Captcha*) printf "${BG_YELLOW} Captcha  ${C_RESET}" ;;
         RangeBlk) printf "${BG_YELLOW} RangeBlk ${C_RESET}" ;;
         RateLim)  printf "${BG_YELLOW} RateLim  ${C_RESET}" ;;
         Block|*)  printf "${BG_RED} ✘ Block  ${C_RESET}" ;;
+    esac
+}
+
+# Return 0 if any request to the given hosts failed at transport level (DNS/TCP/TLS/timeout).
+net_failed() {
+    [[ -s "$NET_LOG" ]] || return 1
+    local h
+    for h in "$@"; do
+        awk -v h="$h" '$1 != 0 && $2 == h { f=1 } END { exit !f }' "$NET_LOG" && return 0
+    done
+    return 1
+}
+
+# A "Block" verdict without any HTTP answer is a connectivity failure, not a geo-block.
+# Usage: norm_srv <status_var> <detail_var> <host>...
+norm_srv() {
+    local -n _st="$1" _dt="$2"
+    shift 2
+    if [[ "${_st:-}" == "Block" || -z "${_st:-}" ]] && [[ -z "${_dt:-}" || "$_dt" =~ ^(Err|000|N/A)$ ]] && net_failed "$@"; then
+        _st="NoConn"; _dt="Timeout"
+    fi
+}
+
+net_err_name() {
+    case "$1" in
+        6) echo "DNS" ;; 7) echo "Refused" ;; 28) echo "Timeout" ;;
+        35|60) echo "TLS" ;; 52|56) echo "Reset" ;; *) echo "Err$1" ;;
     esac
 }
 
@@ -577,6 +627,7 @@ run_check_for_stack() {
     local IS_LOCAL_IP="$4"
 
     local TMP_DIR="$BASE_TMP/${IPV_LABEL}"
+    local NET_LOG="$TMP_DIR/net.log"
     mkdir -p "$TMP_DIR"
 
     # --- 1. Fetch All 12+ IP Databases & BGP Telemetry in Parallel ---
@@ -1126,7 +1177,7 @@ run_check_for_stack() {
                     fi
                     if [[ -z "$rtt" ]]; then
                         local t_conn
-                        t_conn=$(curl -s "$IPV_MODE" -m 2 -o /dev/null -w "%{time_connect}" "$url" 2>/dev/null || true)
+                        t_conn=$(command curl -s "$IPV_MODE" -m 2 -o /dev/null -w "%{time_connect}" "$url" 2>/dev/null || true)
                         if [[ -n "$t_conn" && "$t_conn" != "0.000000" ]]; then
                             rtt=$(awk -v t="$t_conn" 'BEGIN {printf "%.1f ms (TCP)", t * 1000}')
                         fi
@@ -1592,7 +1643,7 @@ run_check_for_stack() {
 
     local col2_hdr="ipwho"
     local C_COL2="N/A" P_COL2="N/A" V_COL2="N/A" R_COL2="N/A" S_COL2="N/A" A_COL2="N/A" B_COL2="N/A"
-    if jq -e 'has("is_proxy")' "$TMP_DIR/ipapi_is.json" &>/dev/null; then
+    if jq -e '(.is_proxy | type) == "boolean"' "$TMP_DIR/ipapi_is.json" &>/dev/null; then
         col2_hdr="ipapi"
         C_COL2=$(jq -r '.location.country_code // empty' "$TMP_DIR/ipapi_is.json" 2>/dev/null || true)
         P_COL2=$(jq_get "$TMP_DIR/ipapi_is.json" '.is_proxy')
@@ -1742,6 +1793,12 @@ run_check_for_stack() {
         IFS='|' read -r s_yt r_yt t_yt <<<"$(cat "$TMP_DIR/srv_youtube" 2>/dev/null || true)"
         IFS='|' read -r s_sp r_sp t_sp <<<"$(cat "$TMP_DIR/srv_spotify" 2>/dev/null || true)"
         IFS='|' read -r s_tw r_tw t_tw <<<"$(cat "$TMP_DIR/srv_twitch" 2>/dev/null || true)"
+        norm_srv s_tt t_tt www.tiktok.com
+        norm_srv s_dp t_dp disney.api.edge.bamgrid.com
+        norm_srv s_nf t_nf www.netflix.com api.fast.com
+        norm_srv s_yt t_yt www.youtube.com
+        norm_srv s_sp t_sp spclient.wg.spotify.com
+        norm_srv s_tw t_tw gql.twitch.tv
 
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Streaming:" "TikTok" "Disney+" "Netflix" "YouTube" "Spotify" "Twitch"
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
@@ -1760,6 +1817,12 @@ run_check_for_stack() {
         IFS='|' read -r s_cp r_cp t_cp <<<"$(cat "$TMP_DIR/ai_copilot" 2>/dev/null || true)"
         IFS='|' read -r s_cf r_cf t_cf <<<"$(cat "$TMP_DIR/cdn_cf" 2>/dev/null || true)"
         IFS='|' read -r s_gs r_gs t_gs <<<"$(cat "$TMP_DIR/cdn_google" 2>/dev/null || true)"
+        norm_srv s_oa t_oa chatgpt.com api.openai.com
+        norm_srv s_gm t_gm accounts.google.com
+        norm_srv s_cl t_cl claude.ai api.anthropic.com
+        norm_srv s_cp t_cp grok.com api.x.ai
+        norm_srv s_cf t_cf speed.cloudflare.com
+        norm_srv s_gs t_gs www.google.com
 
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "AI / Web:" "ChatGPT" "Gemini" "Claude" "xAI Grok" "Cloudflare" "Google"
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
@@ -1778,6 +1841,12 @@ run_check_for_stack() {
         IFS='|' read -r s_ig r_ig t_ig <<<"$(cat "$TMP_DIR/ext_insta" 2>/dev/null || true)"
         IFS='|' read -r s_gh r_gh t_gh <<<"$(cat "$TMP_DIR/ext_github" 2>/dev/null || true)"
         IFS='|' read -r s_tg r_tg t_tg <<<"$(cat "$TMP_DIR/ext_telegram" 2>/dev/null || true)"
+        norm_srv s_rd t_rd www.reddit.com
+        norm_srv s_wk t_wk en.wikipedia.org
+        norm_srv s_st t_st store.steampowered.com
+        norm_srv s_ig t_ig www.instagram.com
+        norm_srv s_gh t_gh api.github.com
+        norm_srv s_tg t_tg api.telegram.org
 
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%-11s%-11s%-11s%-11s%-11s%-11s\n" "Platforms:" "Reddit" "Wikipedia" "Steam" "Instagram" "GitHub" "Telegram"
         print_rail; printf "${C_CYAN}%-11s${C_RESET}%s %s %s %s %s %s\n" "Status:" \
@@ -1888,6 +1957,30 @@ run_check_for_stack() {
         print_section_end
     fi
 
+    # --- Network Diagnostics (only shown when requests failed) ---
+    if [[ -s "$NET_LOG" ]]; then
+        local net_total net_fail
+        net_total=$(wc -l < "$NET_LOG" | tr -d ' ')
+        net_fail=$(awk '$1 != 0' "$NET_LOG" | wc -l | tr -d ' ')
+        if ((net_fail > 0)); then
+            print_section "Network Diagnostics (${IPV_LABEL})"
+            print_rail; printf "${C_YELLOW}%-18s${C_RESET}%s of %s requests failed after retries\n" "Failed Requests:" "$net_fail" "$net_total"
+            local err_summary="" rc cnt
+            while read -r cnt rc; do
+                err_summary+="$(net_err_name "$rc"): ${cnt}  "
+            done < <(awk '$1 != 0 {print $1}' "$NET_LOG" | sort | uniq -c | sort -rn)
+            print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Error Types:" "$err_summary"
+            local hosts
+            hosts=$(awk '$1 != 0 {print $2}' "$NET_LOG" | sort -u | head -n 8 | tr '\n' ' ')
+            print_rail; printf "${C_CYAN}%-18s${C_RESET}%s\n" "Hosts:" "$hosts"
+            if ((net_fail * 4 >= net_total)); then
+                print_rail; printf "${C_YELLOW}%-18s${C_RESET}%s\n" "Hint:" "Host network/DNS drops parallel requests. N/A & NoConn are NOT blocks."
+                print_rail; printf "${C_DIM}%-18s%s${C_RESET}\n" "" "Check /etc/resolv.conf (try 1.1.1.1), firewall/conntrack limits, re-run."
+            fi
+            print_section_end
+        fi
+    fi
+
     # --- Overall IP Quality Verdict Card ---
     local score_sum=0 score_cnt=0 s_val
     for s_val in "$SCAM_SCORE" "$IPQS_SCORE" "$IPQ_SCORE" "$I2L_SCORE" "$ABUSE_SCORE" "$PCHECK_SCORE" "$IPREG_SCORE" "$IPDATA_SCORE"; do
@@ -1897,13 +1990,13 @@ run_check_for_stack() {
         fi
     done
 
-    if ((score_cnt == 0)); then
+    if ((score_cnt < 3)); then
         printf '\n'
         printf ' %s╭──────────────────────────────────────────────────────────────────────────────╮%s\n' "$C_BORDER" "$C_RESET"
-        printf ' %s│%s  %s  %sTrust Score: N/A%s  %s·  No risk engines responded%s\n' \
+        printf ' %s│%s  %s  %sTrust Score: N/A%s  %s·  Only %d of 8 risk engines responded%s\n' \
             "$C_BORDER" "$C_RESET" "${BG_GRAY}  GRADE N/A  ${C_RESET}" \
-            "$C_WHITE" "$C_RESET" "$C_DIM" "$C_RESET"
-        printf ' %s│%s  %sVerdict:%s Unable to compute verdict (database queries timed out or failed)\n' "$C_BORDER" "$C_RESET" "$C_CYAN" "$C_RESET"
+            "$C_WHITE" "$C_RESET" "$C_DIM" "$score_cnt" "$C_RESET"
+        printf ' %s│%s  %sVerdict:%s Insufficient data for a reliable verdict (queries failed) · Re-run\n' "$C_BORDER" "$C_RESET" "$C_CYAN" "$C_RESET"
         printf ' %s╰──────────────────────────────────────────────────────────────────────────────╯%s\n' "$C_BORDER" "$C_RESET"
         return
     fi
@@ -1956,7 +2049,7 @@ IPV6_ADDR=""
     fi
 
     probe4_flag=""
-    if curl -s4 --connect-timeout 3 -m 5 -o /dev/null "https://stat.ripe.net/data/prefix-overview/data.json?resource=1.1.1.1" 2>/dev/null; then
+    if command curl -s4 --connect-timeout 3 -m 5 -o /dev/null "https://stat.ripe.net/data/prefix-overview/data.json?resource=1.1.1.1" 2>/dev/null; then
         probe4_flag="-4"
         echo "-4" > "$BASE_TMP/db_curl_flag"
         DB_CURL_FLAG="-4"
