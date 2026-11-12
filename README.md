@@ -45,25 +45,14 @@ bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipche
 bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipcheck.sh) -o report.txt
 ```
 
-### Direct Queries Only (Disable Aggregator Fallback)
-```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipcheck.sh) --direct
-```
-
-### Low-Resource VPS (Limit Concurrent Connections)
-On small VPS instances (1 vCPU, limited bandwidth/conntrack), limit concurrent background requests:
-```bash
-IPQ_PARALLEL=4 bash <(curl -Ls https://raw.githubusercontent.com/Dipperp24/IPQuality/main/ipcheck.sh)
-```
-
 ## Optional Custom API Keys
-You can optionally pass your own API keys via environment variables for higher rate limits or enterprise tiers (by default, the script works out of the box using keyless public demos and direct endpoints for MaxMind, IP2Location, Scamalytics, ipwhois, ProxyCheck, ip-api, ipquery, and IPinfo):
+The script works out of the box using keyless public demos and direct endpoints for MaxMind, IP2Location, Scamalytics, ipwhois, ProxyCheck, ip-api, ipquery, ipdata (`/me`), ipregistry, and IPinfo. Sources marked key-only below require their respective API key via environment variable (or can use keys for higher limits):
 - `IPINFO_TOKEN` — ipinfo.io API token
 - `IPREGISTRY_KEY` — ipregistry.co API key
 - `IPDATA_KEY` — ipdata.co API key
-- `IPAPI_KEY` — ipapi.is API key
-- `ABUSEIPDB_KEY` — AbuseIPDB APIv2 key
-- `IPQS_KEY` — IPQualityScore API key
+- `IPAPI_KEY` — ipapi.is API key (required for risk/security data since Sept 2026)
+- `ABUSEIPDB_KEY` — AbuseIPDB APIv2 key (required)
+- `IPQS_KEY` — IPQualityScore API key (required)
 - `IP2LOCATION_KEY` — IP2Location.io API key
 - `PROXYCHECK_KEY` — proxycheck.io API key
-- `DBIP_KEY` — db-ip.com API key
+- `DBIP_KEY` — db-ip.com API key (required for threatLevel)
